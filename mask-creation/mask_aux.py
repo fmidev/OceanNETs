@@ -25,15 +25,15 @@ def read_deployment_data():
         scenarios.append(start_year+'-'+volume)
         
         
-    data=dict()    
+    dep_data=dict()    
 
     for scenario in scenarios:
-        data[scenario]=pd.read_excel(ifile,sheet_name=scenario,index_col=0)
+        dep_data[scenario]=pd.read_excel(ifile,sheet_name=scenario,index_col=0)
         
         #Replace NaNs with 0's
-        data[scenario]=data[scenario].fillna(0.)
+        dep_data[scenario]=dep_data[scenario].fillna(0.)
         
-    return data
+    return dep_data
 
 
 def year2mon(inputdata):
@@ -62,11 +62,13 @@ def year2mon(inputdata):
     data_monthly=pd.DataFrame(0, index=all_months, columns=inputdata.columns) # Unit: Gt CaO / month
     data_monthly_mol_s=pd.DataFrame(0, index=all_months, columns=inputdata.columns) # mol CaO / second
 
-    
+    columns=['dep-China', 'dep-Europe', 'dep-US']  
+
     gt_2_g=1e6*1e9 # Gt to g
     n_cao=56.1 #Molar mass of CaO [g/mol]
-    for column in data_monthly.columns:
-        data_monthly.loc[2030:2101, column]=np.repeat(inputdata[column].values/12,12)
+    for column in columns:
+        # Set initially annual value for each month, and divide later between months
+        data_monthly.loc[2030:2101, column]=np.repeat(inputdata[column].values,12)
         
     
     j=0
@@ -79,11 +81,11 @@ def year2mon(inputdata):
             yearlen=365
             monlen_year=monlen
         for imon in range(12):
-            data_monthly[column].iloc[j]=data_monthly[column].iloc[j]/yearlen*monlen_year[imon]
+            data_monthly[columns].iloc[j]=data_monthly[columns].iloc[j]*(monlen_year[imon]/yearlen)
             
             # Calculate the deployment rates in units of mol CaO / s
             if iyear >= 2030:
-                data_monthly_mol_s[column].iloc[j]=inputdata.loc[iyear, column]/n_cao/(365*3600*24)*gt_2_g
+                data_monthly_mol_s.iloc[j,0:3]=inputdata.loc[iyear, columns]*gt_2_g/n_cao/(365*24*3600)
 
             j=j+1
     
@@ -153,24 +155,35 @@ def create_eez_mask():
     # print(lats)
     # print(lat)
     #maskeez = regionmask.mask_geopandas(eez, lon, lat,wrap_lon=True)
-    maskeez = regionmask.mask_geopandas(eez, lons, lats,wrap_lon=True)
+    maskeez = regionmask.mask_geopandas(eez, lons, lats,wrap_lon=True) #Write this into a file
     return eez, maskeez
 
 def gridarea():
+    # reso=0.5 #degrees
+    # mlons,mlats=np.meshgrid(np.linspace(-179.75,179.75,720),np.linspace(-89.75,89.75,360))
+    # mlons_b,mlats_b=np.meshgrid(np.linspace(-180,180,721),np.linspace(-90,90,361))
+    # #grid=gridsize(mlats)
+    # grid=np.cos(np.radians(abs(mlats)))*((2*np.pi*6378.137*reso)*(2*np.pi*6378.137*reso)*1000*1000)
+    # print(grid)
+    # grid_nc=xr.DataArray(grid,coords={'lat':mlats[:,1],'lon':mlons[1,:]},dims=['lat','lon'])
+    # lat_size=110567 #in m
+    # grid_nc['m2']=grid_nc*lat_size
+    # grid_nc=grid_nc['m2']
+    # grid_nc.to_netcdf('earth_m2.nc')
+    # # plt.pcolormesh(mlons[1,:],mlats[:,1],grid_nc)
+    # # plt.colorbar()
+    # #plt.show()
     reso=0.5 #degrees
     mlons,mlats=np.meshgrid(np.linspace(-179.75,179.75,720),np.linspace(-89.75,89.75,360))
     mlons_b,mlats_b=np.meshgrid(np.linspace(-180,180,721),np.linspace(-90,90,361))
     #grid=gridsize(mlats)
-    grid=np.cos(np.radians(abs(mlats)))*((2*np.pi*6378.137*reso)*(2*np.pi*6378.137*reso)*1000*1000)
-    print(grid)
+    # create grid data
+    grid=np.cos(np.radians(abs(mlats)))*(111100*reso*111100*reso)
+    # print(grid)
+    # create data array
     grid_nc=xr.DataArray(grid,coords={'lat':mlats[:,1],'lon':mlons[1,:]},dims=['lat','lon'])
-    lat_size=110567 #in m
-    grid_nc['m2']=grid_nc*lat_size
+    grid_nc['m2']=grid_nc#*lat_size
     grid_nc=grid_nc['m2']
-    grid_nc.to_netcdf('earth_m2.nc')
-    # plt.pcolormesh(mlons[1,:],mlats[:,1],grid_nc)
-    # plt.colorbar()
-    #plt.show()
     return grid_nc
 
 def masking_boxes(mask):

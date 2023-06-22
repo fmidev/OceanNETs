@@ -34,35 +34,17 @@ from mask_aux import create_eez_mask, gridarea, masking_boxes, read_deployment_d
 
 
 
-# def emissions_per_area():
-#     n_ca_oh_2=74.1 #g/mol
-#     china_lime=np.array([0,0,0,0.14,0.267718,0.413041,0.571405,0.738835,0.91324,
-#                          1.09045,1.266208,1.438202,1.606129,1.76801,1.921216,2.0641,2.197527,2.323329])*1e6*1e3*1e3 #g/year
-
-#     lime_year=np.linspace(2015,2100,china_lime.size)
-#     all_years=np.linspace(2015,2100,(2100-2015+1)*12)
-#     china_lime_yearly=np.interp(all_years, lime_year, china_lime)
-#     eu_lime_yearly=china_lime_yearly.copy()
-#     us_lime_yearly=china_lime_yearly.copy()
-
-#     print(china_lime_yearly)
-#     return china_lime_yearly,eu_lime_yearly,us_lime_yearly
-
-
-
-
 
 #These could be moved into a loop
-scenario='2040-high'
-data=read_deployment_data()
-data_monthly=dict()
-data_monthly_mol_s=dict()
-data_monthly_mol_s_m2=dict()
+scenario='2030-high'
+dep_data=read_deployment_data()
+dep_data_monthly=dict()
+dep_data_monthly_mol_s=dict()
+dep_data_monthly_mol_s_m2=dict()
 
 
 # start_year=int(scenario[0:4])
 #usdata=read_eu_us_data('USA (lime and cement)')
-
 
 
 
@@ -78,15 +60,7 @@ molar_mass['Ca(OH)2']=n_ca_oh_2
 # hack it now
 n_ca_oh_2=n_ca_o
 
-
-
-
-
-
-data_monthly[scenario], data_monthly_mol_s[scenario]=year2mon(data[scenario])
-
-
-#plt.show()
+dep_data_monthly[scenario], dep_data_monthly_mol_s[scenario]=year2mon(dep_data[scenario])
 
 
 grid_nc=gridarea()
@@ -112,7 +86,7 @@ EU_index=regionmask.defined_regions.natural_earth_v5_0_0.countries_50.map_keys([
                   'United Kingdom','Ireland','Portugal','Slovenia'])
 temp=grid_nc.copy()
 #temp.m2.data[:,:]=np.nan
-print(temp.m2)
+# print(temp.m2)
 plt.figure()
 temp.m2.plot()
 china_m2=temp.m2.where(b==china_index)
@@ -161,7 +135,6 @@ for i in included_eez_dict:
         print('Computing China')
         data2.data=np.where((data.data==float(i)),10,data2.data)
 
-
     elif included_eez_dict[i]=='United States of America':
         print('Computing USA')
         data2.data=np.where((data.data==float(i)),20,data2.data)
@@ -173,7 +146,7 @@ data2.data=np.where(~np.isnan(data2.data),data2.data,np.nan)
 #data_penalty.data=np.where(~np.isnan(data_penalty.data),data_penalty.data,np.nan)
 print(data2)
 # calculate the area of sea used for different parts
-area_china=float(grid_nc.where(data2.data==10).sum())
+area_china=970136511529.54 #float(grid_nc.where(data2.data==10).sum())
 area_us=float(grid_nc.where(data2.data==20).sum())
 area_eu=float(grid_nc.where(data2.data==30).sum())
 print(f"CHINA: {area_china:.2f}")
@@ -190,10 +163,10 @@ data2=data2.expand_dims({'time':time_dates}).copy()
 
 
 # Change to liming data as mol m-2 s-1
-data_monthly_mol_s_m2[scenario]=data_monthly_mol_s[scenario].copy()
-data_monthly_mol_s_m2[scenario]['dep-China']=data_monthly_mol_s_m2[scenario]['dep-China']/area_china
-data_monthly_mol_s_m2[scenario]['dep-US']=data_monthly_mol_s_m2[scenario]['dep-US']/area_us
-data_monthly_mol_s_m2[scenario]['dep-Europe']=data_monthly_mol_s_m2[scenario]['dep-Europe']/area_eu
+dep_data_monthly_mol_s_m2[scenario]=dep_data_monthly_mol_s[scenario].copy()
+dep_data_monthly_mol_s_m2[scenario]['dep-China']=dep_data_monthly_mol_s_m2[scenario]['dep-China']/area_china
+dep_data_monthly_mol_s_m2[scenario]['dep-US']=dep_data_monthly_mol_s_m2[scenario]['dep-US']/area_us
+dep_data_monthly_mol_s_m2[scenario]['dep-Europe']=dep_data_monthly_mol_s_m2[scenario]['dep-Europe']/area_eu
 
 
 
@@ -210,14 +183,16 @@ for i in range(data2.data.shape[0]):
 
     # print(imonth)
     #input()
-    if data_monthly_mol_s_m2[scenario]['dep-China'].iloc[i]>1e-40:
-        data2.data[i,:,:]=np.where((data2.data[i,:,:]==10),data_monthly_mol_s_m2[scenario]['dep-China'].iloc[i],data2.data[i,:,:])
-        
-    if data_monthly_mol_s_m2[scenario]['dep-US'].iloc[i]>1e-40:
-        data2.data[i,:,:]=np.where((data2.data[i,:,:]==20),data_monthly_mol_s_m2[scenario]['dep-US'].iloc[i],data2.data[i,:,:])
+    
+    for region, region_id in zip(['China','US','Europe'],[10,20,30]):
+        data2.data[i,:,:]=np.where((data2.data[i,:,:]==region_id),dep_data_monthly_mol_s_m2[scenario]['dep-'+region].iloc[i],data2.data[i,:,:])
 
-    if data_monthly_mol_s_m2[scenario]['dep-Europe'].iloc[i]>1e-40:
-        data2.data[i,:,:]=np.where((data2.data[i,:,:]==30),data_monthly_mol_s_m2[scenario]['dep-Europe'].iloc[i],data2.data[i,:,:])
+        
+    # if dep_data_monthly_mol_s_m2[scenario]['dep-US'].iloc[i]>1e-40:
+    #     data2.data[i,:,:]=np.where((data2.data[i,:,:]==20),dep_data_monthly_mol_s_m2[scenario]['dep-US'].iloc[i],data2.data[i,:,:])
+
+    # if dep_data_monthly_mol_s_m2[scenario]['dep-Europe'].iloc[i]>1e-40:
+    #     data2.data[i,:,:]=np.where((data2.data[i,:,:]==30),dep_data_monthly_mol_s_m2[scenario]['dep-Europe'].iloc[i],data2.data[i,:,:])
 
 data2=masking_boxes(data2)
 
@@ -252,33 +227,10 @@ mask=xr.Dataset(
                author='Tommi Bergman (FMI)'
         )
 )
-# data_penalty=china_penalty+US_penalty+EU_penalty
-# co2penalty=xr.Dataset(
-#     data_vars=dict(
-#         co2penalty=(['time','lat','lon'],china_penalty.data,{'units':'kg m-2 s-1'})
-#         #gridarea=(['lat','lon'],grid*lat_size,{'units':'m-2'})
-#         #mask=(['time','lat','lon'],data2.data,{'units':'country number'})
-#         #data_vars=(['lon','lat'],data,{'units':'mol/s'})
-#         ),
-#     coords=dict(
-#         time=('time',time_dates),
-#         lon=('lon',lons,{'units':'degrees_east'}),
-#         lat=('lat',lats,{'units':'degrees_north'})
-#         ),
-#     attrs=dict(description='CO2 penalty for CCS for ocean alkalinization for WP4 of OceanNETs project.\
-#                Based on the world exclusive economic zones (marineregions.org) and work done by Spyros Foteinis and Phil Renforth \
-#                    for annual lime production numbers.',
-#                author='Tommi Bergman (FMI)'
-#         )
-# )
-# for i in range(100,150):
-#     print (i)
-#     mask.mask.data=np.where(np.abs(mask.mask.data-i)<0.5,1,mask.mask.data)
+
 # write to disk, this includes
 mask.to_netcdf('../data/lime_mask_v2.cao.nc')
-# co2penalty.to_netcdf('../../data/co2penalty.nc')
-# mask.plot()
-# plt.figure()
+
 plt.figure()
 plt.title('eez')
 eez.plot()

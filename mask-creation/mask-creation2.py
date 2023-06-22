@@ -143,6 +143,7 @@ for i in included_eez_dict:
         data2.data=np.where((data.data==float(i)),30,data2.data)
 
 data2.data=np.where(~np.isnan(data2.data),data2.data,np.nan)
+data2=masking_boxes(data2)
 #data_penalty.data=np.where(~np.isnan(data_penalty.data),data_penalty.data,np.nan)
 print(data2)
 # calculate the area of sea used for different parts
@@ -194,7 +195,7 @@ for i in range(data2.data.shape[0]):
     # if dep_data_monthly_mol_s_m2[scenario]['dep-Europe'].iloc[i]>1e-40:
     #     data2.data[i,:,:]=np.where((data2.data[i,:,:]==30),dep_data_monthly_mol_s_m2[scenario]['dep-Europe'].iloc[i],data2.data[i,:,:])
 
-data2=masking_boxes(data2)
+
 
 #data2=data2.expand_dims({'time':time_dates.size}).copy()
 # expand time dimension

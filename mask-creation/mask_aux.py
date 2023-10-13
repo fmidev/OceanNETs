@@ -155,7 +155,16 @@ def create_eez_mask():
     # print(lats)
     # print(lat)
     #maskeez = regionmask.mask_geopandas(eez, lon, lat,wrap_lon=True)
-    maskeez = regionmask.mask_geopandas(eez, lons, lats,wrap_lon=True) #Write this into a file
+    
+    load_eez_mask_from_file=True #Whether to use EEZ borders calculated before by this script 
+    
+    eez_maskfile='../data/eez_mask.nc'
+    
+    if load_eez_mask_from_file:
+        maskeez=xr.load_dataarray(eez_maskfile)
+    else:
+        maskeez = regionmask.mask_geopandas(eez, lons, lats,wrap_lon=True)
+        maskeez.to_netcdf(eez_maskfile)
     return eez, maskeez
 
 def gridarea():
@@ -266,3 +275,13 @@ def masking_boxes(mask):
     print(mask2)
     mask2=mask2.where(~mask2.isnull(),0)
     return mask2
+
+#def regrid_to_model(indata,ifile='/Users/bergmant/Documents/projects/H2020-OceanNET/data/bathy_meter.nc'):
+
+#     ingrid=xr.open_dataset(ifile)
+#     if 'nav_lon' in ingrid:
+#         ingrid.rename({'nav_lon':'lon', 'nav_lat':'lat'})
+#     regridder = xe.Regridder(indata, ingrid, 'bilinear', periodic=True) #since this is global we need to pass periodic
+#     mask_orca1=regridder(indata)
+#     mask_orca1.to_netcdf('/Users/bergmant/Documents/projects/H2020-OceanNET/scripts/limemask_v2.orca1.nc',engine='scipy')
+#     return mask_orca1

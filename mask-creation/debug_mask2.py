@@ -12,11 +12,11 @@ from mask_aux import read_deployment_data
 import matplotlib.pyplot as plt
 import pandas as pd
 
-data=xr.open_dataset('../data/lime_mask_cao_2030-high.nc')
+data=xr.open_dataset('../data/lime_mask_cao_2040-high.nc')
 data_tb=xr.open_dataset('../data/lime_mask_v2.cao_tommi.nc')
 
 
-scenario='2030-high'
+scenario='2040-high'
 dep_data=read_deployment_data()
 
 gt_2_g=1e6*1e9 # Gt to g

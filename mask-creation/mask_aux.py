@@ -13,6 +13,7 @@ import regionmask
 from itertools import product
 import calendar
 import csv
+import os
 
 def read_deployment_data():
     ifile='../data/Case study 1 - deployment rates.xlsx'
@@ -160,7 +161,8 @@ def create_eez_mask():
     
     eez_maskfile='../data/eez_mask.nc'
     
-    if load_eez_mask_from_file:
+    #if load_eez_mask_from_file:
+    if os.path.isfile(eez_maskfile):
         maskeez=xr.load_dataarray(eez_maskfile)
     else:
         maskeez = regionmask.mask_geopandas(eez, lons, lats,wrap_lon=True)

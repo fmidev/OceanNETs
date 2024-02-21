@@ -1,0 +1,26 @@
+#
+# do not add netcdf4, breaks xesmf for some reason
+# numba added for xesmf, which should be a dependency
+#
+name: postprocess
+channels:
+  - conda-forge
+dependencies:
+  - python
+  - xarray
+  - numpy
+  - pandas
+  - numba
+  - geopandas
+  - matplotlib>=3.5.2
+  - cartopy
+  - scipy
+  - emacs
+  - regionmask
+  - ncview
+  - netcdf-fortran
+  - cdo
+  - h5netcdf
+  - paramiko
+  - netcdf4
+  - dask

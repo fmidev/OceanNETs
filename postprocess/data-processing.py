@@ -6,6 +6,7 @@ import xarray as xr
 import os
 #import netCDF4 as nc
 import glob
+import calendar
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import pandas as pd 
@@ -51,12 +52,12 @@ import pandas as pd
 vars={
     #global means
     'fgco2': 'fgco2_glob',
-    'fgoae': 'fgoae_glob',
+    'alkalinization': 'fgoae_glob',
     'fgdcr': 'fgdcr_glob',
     'tosga': 'tosga',
     'dissic': 'dissic_glob',
     #'talk': 'talk_glob',
-    'xco2atm': 'xco2atmga',
+    'co2': 'xco2atmga',
     'tas': 'tasga',
     'nbp': 'nbp_glob',
     'gpp': 'gpp_glob',
@@ -75,7 +76,7 @@ vars={
 
     }
 units = {
-        'fgco2_glob': 'molC m-2 s-1',
+        'fgco2_glob': 'PgC yr-1',#monthly????
         'fgoae': 'Pmol TA yr-1', #monthly
         'fgdcr':'Pg C yr-1',
         'tasga':'degC',
@@ -103,45 +104,71 @@ expnames={
 'C40H':'esm-ssp534-over-2040high-dcr'}
 
 n_c=12.011
-unit_conversions = {'cSoil':1e-12,  #kgm-2 -> PgC m-2
-                'cVeg':1e-12,   #kgm-2 -> PgC m-2
-                'gpp':1e-12*3600*24,    #kgm-2s-1 -> PgCm-2day-1
-                'nbp':1e-12*3600*24,    #kgm-2s-1 -> PgCm-2day-1
-                'fgco2':1e-12*3600*24,    #kgm-2s-1 -> PgCm-2day-1
-                'dissicos':1,    #molm-3
-                'talkos':1,    #molm-3
-                'spco2':1e6/101325,    # Pa -> uAtm
-                'xco2':1e6,    # mol/mol -> umol/mol or ppm  
-                'ph':1, # no conversion unit of 1
-                'omeagac':1, #no conversion unit of 1
-                'fgdcr':1e-12*3600*24, # XXXX
-                'fgoae':1e-15*3600*24, # xxxxx->Pmol m-3 day-1
-                'tas':-273.15 # K -> C 
+unit_conversions = {'cSoil':[1e-12,False],  #kgm-2 -> PgC m-2
+                'cVeg':[1e-12,False],   #kgm-2 -> PgC m-2
+                'gpp':[1e-12*3600*24,True],    #kgm-2s-1 -> PgCm-2day-1
+                'nbp':[1e-12*3600*24,True],    #kgm-2s-1 -> PgCm-2day-1
+                'fgco2':[1e-12*3600*24,True],    #kgm-2s-1 -> PgCm-2day-1
+                'dissicos':[1,False],    #molm-3
+                'talkos':[1,False],    #molm-3
+                'spco2':[1e6/101325,False],    # Pa -> uAtm
+                'xco2':[1e6,False],    # mol/mol -> umol/mol or ppm  
+                'ph':[1,False], # no conversion unit of 1
+                'omeagac':[1,False], #no conversion unit of 1
+                'fgdcr':[1e-12*3600*24,True], # XXXX
+                'fgoae':[1e-15*3600*24,True], # xxxxx->Pmol m-3 day-1
+                'tas':[-273.15,False] # K -> C 
                 }  
-def convert_units(data):
-    for i in data:
-        print(i)
+def convert_units(data,var):
+    monlen=[31,28,31,30,31,31,30,31,30,31,30,31]
+    monlen_leap=[31,29,31,30,31,31,30,31,30,31,30,31]
 
-def read_and_save_netcdf(local_path,fname):
+    for i in data:
+        print(data[i],var)
+        print(data[i].values[0])
+        tmp=data[i].values[0]
+        print (unit_conversions[var][1])
+        iyear = data[i].time[0].dt.year
+        print(iyear)
+        if unit_conversions[var]:
+            if calendar.isleap(iyear):
+                data[i] = data[i]*monlen_leap
+            else:   
+                data[i] = data[i]*monlen
+        if var == 'tas':  
+            data[i].values = data[i].values + unit_conversions[var][0]
+        else:
+            print (data[i],unit_conversions[var][0])
+            data[i].values = data[i].values * unit_conversions[var][0]
+        print('heå',data[i].values[0]/tmp,unit_conversions[var][0]*31.0)
+        #print(data[i].values[0]*unit_conversions[var][0])
+    
+    
+def read_and_save_netcdf(local_path,exp):
     # Read data from the downloaded NetCDF file
     #matching_files = [f for f in local_files if glob.fnmatch.fnmatch(f, fname)]
     #fname='D40H_*pisces*_2D*'
+    var='fgco2'
     model_id='EC-Earth'
     year,month,day,hour=date_string()
    
     version_id=f'v{year}{month}{day}'
     
-    experiment_id=expnames[exp[0]]
+    experiment_id=expnames[exp]
     outpath=f'/Volumes/ONETs-SSD/{experiment_id}/2D'
+    outpath=f'testout/'
     isExist = os.path.exists(outpath)
     time_range='2030-2100'
     syear='2050'
     if not isExist:
         # Create a new directory because it does not exist
         os.makedirs(outpath)
-    
+    fname=f'{var}_*mon*{syear}*nc'   
     local_files = glob.glob(os.path.join(local_path, fname))
+    print (local_files)
+    # extract area from areacello
     area=xr.open_dataset('areacello_Ofx_EC-Earth3-CC_esm-pi-cdr-pulse_r1i1p1f1_gr.nc',engine='h5netcdf')
+    areab=area.areacello.fillna(0)
     # Download each matching file
     #testout='talkos_'
     var=fname.split('_')[0]
@@ -158,7 +185,6 @@ def read_and_save_netcdf(local_path,fname):
     # print(mask_US) 
     outputname=f'{variable_name}_{model_id}_{experiment_id}_{time_range}_{version_id}.nc'
 
-    areab=area.areacello.fillna(0)
     print(local_files)
     print(local_path)
     print(fname)
@@ -176,42 +202,61 @@ def read_and_save_netcdf(local_path,fname):
         xrds=xr.open_dataset(local_file,engine='h5netcdf')
         plt.figure()
         data={}
-        for reg in regions:
-            if reg =='CHINA':
-                match=10
-            elif reg =='US':
-                match=20
-            elif reg =='EU':
-                match=30
-            else:
-                match=-999
-            if reg== 'glob':
-                data[reg]=xrds[var].mean(dim=('i','j'), skipna=True)
+        if vars[var].split('_')[1]=='reg':
+            for reg in regions:
+                if reg =='CHINA':
+                    match=10
+                elif reg =='US':
+                    match=20
+                elif reg =='EU':
+                    match=30
+                else:
+                    match=-999
+                if reg== 'glob':
+                    data[reg]=xrds[var].weighted(areab).mean(dim=('i','j'), skipna=True)
 
-            else:
-                data[reg]=xrds[var].where(country_mask.mask==match).mean(dim=('i','j'), skipna=True)
-        # create DS
+                else:
+                    data[reg]=xrds[var].where(country_mask.mask==match).mean(dim=('i','j'), skipna=True)
+        else:
+            reg='glob'
+            data[reg]=(xrds[var]*areab).sum(dim=('i','j'), skipna=True)
+            print(data[reg])
+            print('--------------------------------')
+        convert_units(data,var)
         timevalues=xrds.time.values
         print(timevalues)
         print(data['glob'].values)
-        convert_units(data)
-        outds = xr.Dataset(
-            {
-                "global": (["time"], data['glob'].values),
-                "US_EEZ": (["time"], data['US'].values),
-                "EU_EEZ": (["time"], data['EU'].values),
-                "CHINA_EEZ": (["time"], data['CHINA'].values),
-                },
-            coords={
-                "time": timevalues,
-                #"reference_time": pd.Timestamp("2015-01-01"),
-                }
-        )
+        if vars[var].split('_')[1]=='reg':
+            # create Dataset for given variables
+            outds = xr.Dataset(
+                {
+                    "global": (["time"], data['glob'].values,{'units':units[vars[var]]}),
+                    "US_EEZ": (["time"], data['US'].values,{'units':units[vars[var]]}),
+                    "EU_EEZ": (["time"], data['EU'].values,{'units':units[vars[var]]}),
+                    "CHINA_EEZ": (["time"], data['CHINA'].values,{'units':units[vars[var]]}),
+                    },
+                coords={
+                    "time": timevalues,
+                    #"reference_time": pd.Timestamp("2015-01-01"),
+                    }
+            )
+        else:
+            outds = xr.Dataset(
+                {
+                    "global": (["time"], data['glob'].values,{'units':units[vars[var]]}),
+                    },
+                coords={
+                    "time": timevalues,
+                    #"reference_time": pd.Timestamp("2015-01-01"),
+                    }
+            )
+        
         reftime=pd.Timestamp("2015-01-01")
         outds['time'].encoding['units']=f"days since {reftime}"
         outds.attrs={'Source':'EC-Earth3-CC', 'Author':'Tommi Bergman','Institute':'Finnish Meteorological Institute', 'Project':'OceanNETs','Experiment':experiment_id, 'Created':f'{year}-{month}-{day} {hour}'}
         print(outds)
-        outds.to_netcdf(f'{outpath}/{var}_testi_{syear}.nc')
+        outds.to_netcdf(f'{outpath}/{vars[var]}_testi_{syear}.nc')
+        outds.to_netcdf(f'{outpath}/{vars[var]}_{model_id}_{experiment_id}_{version_id}_{syear}.nc')
         #xrds.dpco2.where(country_mask.mask==10).mean(dim=('y','x'), skipna=True).plot()
         #plt.figure()
         #xrds.dpco2.where(country_mask.mask==20).mean(dim=('y','x'), skipna=True).plot()
@@ -258,6 +303,7 @@ if __name__ == "__main__":
     # Paths
     exp=['D30H','C40H']
     localdatapath='.'
+    localdatapath='/Volumes/ONETs-SSD/'
     local_path = localdatapath+'/'+exp[0]+'/'
     isExist = os.path.exists(local_path)
     if not isExist:
@@ -267,7 +313,7 @@ if __name__ == "__main__":
     #mask_eu_us_china=xr.open_dataset('../mask-creation/mask-eu-us-china.nc')
     #download_data_via_ssh(hostname, username, password, remote_path, local_path, 'areacello*nc')
     # Download data via SSH
-    outpath=f'testout/'
+    outpath=f'testout/'+exp[0]+'/'
     for prefix in vars.keys():
         variable_name=prefix
         filname = prefix + "_*mon*gr_20[3]*.nc"
@@ -275,7 +321,7 @@ if __name__ == "__main__":
         #download_data_via_ssh(hostname, username, password, remote_path, local_path, filname)
 
         # Read and save data in NetCDF format
-        read_and_save_netcdf(local_path,filname)
+        read_and_save_netcdf(local_path,exp[0])
 
 
    

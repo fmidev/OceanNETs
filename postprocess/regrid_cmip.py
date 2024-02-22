@@ -119,7 +119,7 @@ for exp in expnames.keys():
         print(files)
         for fname in files:
             ds=xr.open_dataset(fname,engine='h5netcdf')
-            ds.attrs={'Source':'EC-Earth3', 'Author':'Tommi Bergman (FMI)', 'project':'OceanNETs','simulation':experiment_id, 'created':f'{year}-{month}-{day} {hour}'}
+            ds.attrs={'Source':'EC-Earth3', 'Author':'Tommi Bergman','Institute':'Finnish Meteorological Institute',  'project':'OceanNETs','simulation':experiment_id, 'created':f'{year}-{month}-{day} {hour}'}
             ds[var].data=ds[var].data*unit_conversions[var]
             ds[var].attrs['units']=units[var]
             attr_dict=ds[var].attrs

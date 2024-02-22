@@ -1,0 +1,15 @@
+#!/bin/zsh
+set -x
+exp='D30H'
+PATH='/Volumes/ONETs-SSD/'${exp}'/'
+which basename
+basename
+
+ddsgasg
+# for file in ${PATH}/*
+# do  
+#     echo ${file}
+#     f="$(basename ${file})"
+#     echo $f
+#     #cdo remapbil,mygrid $file $PATH/1x1/
+# done  

@@ -10,52 +10,16 @@ import calendar
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import pandas as pd 
-# def download_data_via_ssh(hostname, username, password, remote_path, local_path, file_pattern):
-#     # Connect to the remote server
-#     ssh_client = paramiko.SSHClient()
-#     ssh_client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-#     print(ssh_client)
-#     try:
-#         if password != None:
-#             ssh_client.connect(hostname, username=username, password=password)
-#         else:
-#             ssh_client.connect(hostname, username=username)
-        
-#         # SFTP connection to download the file
-#         sftp = ssh_client.open_sftp()
-#         #remote_file = os.path.join(remote_path, fname)
-#         #local_file = os.path.join(local_path, fname)
-#         # List files matching the pattern on the remote server
-#         print(sftp)
-#         remote_files = sftp.listdir(remote_path)
-#         print(remote_path)
-#         #print(remote_files)
-#         matching_files = [f for f in remote_files if glob.fnmatch.fnmatch(f, file_pattern)]
 
-#         #sftp.get(remote_file_path,'areacello_Ofx_EC-Earth3-CC_esm-pi-cdr-pulse_r1i1p1f1_gr.nc')
-#         # Download each matching file
-#         for remote_file in matching_files:
-#             remote_file_path = os.path.join(remote_path, remote_file)
-#             local_file_path = os.path.join(local_path, remote_file)
-#             sftp.get(remote_file_path, local_file_path)
-#             print(f'Downloaded: {remote_file_path} to {local_file_path}')
-
-#         sftp.close()
-        
-#         print(f'Data downloaded from {remote_file} to {local_file}')
-        
-#     except Exception as e:
-#         print(f'Error: {e}')
-#     finally:
-#         ssh_client.close()
 
 vars={
+    'talk':'talk_glob',
     #global means
     'fgco2': 'fgco2_glob',
     'alkalinization': 'fgoae_glob',
     'fco2removal': 'fgdcr_glob',
     'tos': 'tosga',
-    'dissic': 'dissic_glob',
+    #'dissic': 'dissic_glob',
     'co2': 'xco2atmga',
     'tas': 'tasga',
     'nbp': 'nbp_glob',
@@ -71,7 +35,6 @@ vars={
 #    'omegaa': 'omegaa_reg', #not available
     #3d  integrated
     'intdic':'dissic_glob',
-    'talk':'talk_glob'
 
     }
 units = {
@@ -142,12 +105,21 @@ def convert_units(data,var):
         print(vars[var])
         if vars[var][1]:
             if unit_conversions[var][1]:
-
+                # calculate either new value based on monlenght
+                # or year length (s-1 -> mon-1 or year-1)
                 if calendar.isleap(iyear):
-                    data[i] = data[i]*monlen_leap
+                    if 'yr-1' in units[vars[var]]:
+                        days=366
+                    else:
+                        days=monlen_leap
+                    data[i] = data[i]*days#monlen_leap
                 else:   
-                    data[i] = data[i]*monlen
-        if var == 'tas':  
+                    if 'yr-1' in units[vars[var]]:
+                        days=365
+                    else:
+                        days=monlen
+                    data[i] = data[i]*days#monlen
+        if var == 'tas' or var =='tos':  
             data[i].values = data[i].values + unit_conversions[var][0]
         else:
             print (data[i],unit_conversions[var][0])
@@ -198,141 +170,199 @@ def read_and_save_netcdf(local_path,exp):
     
     regions=['glob','EU','US','CHINA']
     #vars={'co2':'xco2atmga'}
-    for var in vars:
-        print(var)
-        model_id='EC-Earth'
-        outpath=f'/Volumes/ONETs-SSD/{experiment_id}/2D'
-        outpath=f'testout/'
-        isExist = os.path.exists(outpath)
-        time_range='2030-2100'
-        syear='2050'
-        if not isExist:
-            # Create a new directory because it does not exist
-            os.makedirs(outpath)
-        testout=var+'_'
-        outputname=f'{vars[var]}_{model_id}_{experiment_id}_{time_range}_{version_id}.{syear}.nc'
-        if var=='co2':
-            fname=f'tm5/{var}_*mon*{syear}*nc'   
-        elif var=='alkalinization' or var== 'fco2removal2D' or var=='omegac':
-            fname=f'{var}_*1m*{syear}*nc'   
-        else:
-            fname=f'{var}_*mon*{syear}*nc'   
-        local_files = glob.glob(os.path.join(local_path, fname))
-        print(local_files)
-        print(os.path.join(local_path, fname))
-        for local_file in local_files:
-            print(local_file)
-            year=local_file[-9:][:4]
-            outti=testout+year+'.nc'
-            # with nc.Dataset(os.path.join(local_path, local_file), 'r') as nc_file:
-            #     # Do something with the NetCDF data
-            #     # For example, print information about the variables and dimensionsema
-            #     print(nc_file.variables)
-            #     print(nc_file.dimensions)
-            syear=local_file.split('_')[6][:4]
-            xrds=xr.open_dataset(local_file,engine='h5netcdf')
-            #plt.figure()
-            data={}
-            print(vars[var],vars[var][-2:])
-            if vars[var][-3:]=='reg':# and vars[var][-2:]!='ga':
-                for reg in regions:
-                    if reg =='CHINA':
-                        match=10
-                    elif reg =='US':
-                        match=20
-                    elif reg =='EU':
-                        match=30
-                    else:
-                        match=-999
-                    if  var=='omegac':
-                        if reg== 'glob':
-                            print(reg)
-                            data[reg]=(xrds[var]).weighted(area_pis).mean(dim=('y','x'), skipna=True)
-                        else:
-                            print(reg)
-                            data[reg]=xrds[var].where(country_mask_pis.mask==match).weighted(area_pis).mean(dim=('y','x'), skipna=True)                    
-                    else:
-                        if reg== 'glob':
-                            data[reg]=xrds[var].weighted(areab).mean(dim=('i','j'), skipna=True)
-
-                        else:
-                            data[reg]=xrds[var].where(country_mask.mask==match).weighted(areab).mean(dim=('i','j'), skipna=True)
-            else:
-                reg='glob'
-                if var=='tas':
-                    data[reg]=(xrds[var]).weighted(area_atm).mean(dim=('lat','lon'), skipna=True)
-                    print(f'tas {data[reg]}')
-                    
-                elif var=='tos':
-                    data[reg]=(xrds[var]).weighted(areab).mean(dim=('i','j'), skipna=True)
-                    print(f'tas {data[reg]}')
-                    
-                elif var in ['nbp','gpp','cSoil','cVeg']:
-                    if unit_conversions[var][1]:
-                        data[reg]=(xrds[var]*area_atm).sum(dim=('lat','lon'), skipna=True)
-                    else:
-                        data[reg]=(xrds[var]).weighted(area_atm).mean(dim=('lat','lon'), skipna=True)
-                elif var=='co2':
-                    data[reg]=(xrds[var]).isel(lev=1).weighted(area_catm).mean(dim=('lat','lon'), skipna=True)
-                    print(f'co2 {data[reg]}')
-                    print(xrds[var])
-                elif var=='talk':
-                    thk=xr.open_dataset(f'{local_path}/thkcello_Omon_EC-Earth3-CC_esm-pi-cdr-pulse_r1i1p1f1_gr_{syear}01-{syear}12.nc',engine='h5netcdf')
-                    thkb=thk.thkcello.fillna(0)
-                    data[reg]=(xrds[var]*thkb*areab).sum(dim=('i','j','lev'), skipna=True)
-                elif var=='alkalinization'  or var=='fco2removal2D':
-                    data[reg]=(xrds[var]*area_pis).sum(dim=('y','x'), skipna=True)
-               
-                
-                else:
-                    print(var)
-                    if unit_conversions[var][1]:
-                        data[reg]=(xrds[var]*areab).sum(dim=('i','j'), skipna=True)
-                    else:
-                        data[reg]=(xrds[var]).weighted(areab).mean(dim=('i','j'), skipna=True)
-                print(data[reg])
-                print('--------------------------------')
-            convert_units(data,var)
-            if var=='alkalinization' or var == 'omegac' or var=='fco2removal2D':
-                timevalues=xrds.time_counter.values
-            else:
-                timevalues=xrds.time.values
-            print(timevalues)
-            print(data['glob'].values)
-            if vars[var][-3:]=='reg':
-                # create Dataset for given variables
-                outds = xr.Dataset(
-                    {
-                        "global": (["time"], data['glob'].values,{'units':units[vars[var]]}),
-                        "US_EEZ": (["time"], data['US'].values,{'units':units[vars[var]]}),
-                        "EU_EEZ": (["time"], data['EU'].values,{'units':units[vars[var]]}),
-                        "CHINA_EEZ": (["time"], data['CHINA'].values,{'units':units[vars[var]]}),
-                        },
-                    coords={
-                        "time": timevalues,
-                        #"reference_time": pd.Timestamp("2015-01-01"),
-                        }
-                )
-            else:
-                outds = xr.Dataset(
-                    {
-                        "global": (["time"], data['glob'].values,{'units':units[vars[var]]}),
-                        },
-                    coords={
-                        "time": timevalues,
-                        #"reference_time": pd.Timestamp("2015-01-01"),
-                        }
-                )
-            
-            reftime=pd.Timestamp("2015-01-01")
-            outds['time'].encoding['dtype']=float
-            outds['time'].encoding['units']=f"days since {reftime}"
-            outds.attrs={'Source':'EC-Earth3-CC', 'Author':'Tommi Bergman','Institute':'Finnish Meteorological Institute', 'Project':'OceanNETs','Experiment':experiment_id, 'Created':f'{cyear}-{cmonth}-{cday} {chour}'}
-            print(outds)
-            outds.to_netcdf(f'{outpath}/{vars[var]}_testi_{syear}.nc',engine='h5netcdf')
-            outds.to_netcdf(f'{outpath}/{outputname}',engine='h5netcdf')
+    if exp=='C5AF':
+        startyear=2015
+    else:
+        byear=exp[1:-1]
+        startyear=int(f'20{byear}')
+    print (startyear)
+    #print(f'20{startyear}')
+    endyear=2101
     
-    #plt.show()
+    for var in vars:
+        print(f'running post processing: {startyear} - {endyear}')
+        print(var)
+        #for syear in range(startyear,endyear):
+        for syear in range(2016,2101):
+            print(syear)
+            model_id='EC-Earth'
+            outpath=f'/Volumes/ONETs-SSD/{experiment_id}/'
+            #outpath=f'testout/'
+            isExist = os.path.exists(outpath)
+            time_range='2015-2100'
+            #syear='2050'
+            if not isExist:
+                # Create a new directory because it does not exist
+                os.makedirs(outpath)
+            testout=var+'_'
+            outputname=f'{vars[var]}_{model_id}_{experiment_id}_{time_range}_{version_id}.{syear}.nc'
+            if var=='co2':
+                fname=f'tm5/{var}_*mon*{syear}*nc'   
+            elif var=='alkalinization' or var== 'fco2removal2D' or var=='omegac':
+                fname=f'{var}_*1m*{syear}*nc'   
+            else:
+                fname=f'{var}_*mon*{syear}*nc'   
+            local_files = glob.glob(os.path.join(local_path, fname))
+            print(local_files)
+            print(os.path.join(local_path, fname))
+            for local_file in local_files:
+                print(local_file)
+                year=local_file[-9:][:4]
+                outti=testout+year+'.nc'
+                # with nc.Dataset(os.path.join(local_path, local_file), 'r') as nc_file:
+                #     # Do something with the NetCDF data
+                #     # For example, print information about the variables and dimensionsema
+                #     print(nc_file.variables)
+                #     print(nc_file.dimensions)
+                syear=local_file.split('_')[6][:4]
+                xrds=xr.open_dataset(local_file,engine='h5netcdf')
+                #plt.figure()
+                data={}
+                print(vars[var],vars[var][-2:])
+                if vars[var][-3:]=='reg':# and vars[var][-2:]!='ga':
+                    for reg in regions:
+                        if reg =='CHINA':
+                            match=10
+                        elif reg =='US':
+                            match=20
+                        elif reg =='EU':
+                            match=30
+                        else:
+                            match=-999
+                        if  var=='omegac':
+                            if reg== 'glob':
+                                print(reg)
+                                data[reg]=(xrds[var]).weighted(area_pis).mean(dim=('y','x'), skipna=True)
+                            else:
+                                print(reg)
+                                data[reg]=xrds[var].where(country_mask_pis.mask==match).weighted(area_pis).mean(dim=('y','x'), skipna=True)                    
+                        else:
+                            if reg== 'glob':
+                                data[reg]=xrds[var].weighted(areab).mean(dim=('i','j'), skipna=True)
+
+                            else:
+                                data[reg]=xrds[var].where(country_mask.mask==match).weighted(areab).mean(dim=('i','j'), skipna=True)
+                else:
+                    reg='glob'
+                    if var=='tas':
+                        data[reg]=(xrds[var]).weighted(area_atm).mean(dim=('lat','lon'), skipna=True)
+                        print(f'tas {data[reg]}')
+                        
+                    elif var=='tos':
+                        data[reg]=(xrds[var]).weighted(areab).mean(dim=('i','j'), skipna=True)
+                        print(f'tas {data[reg]}')
+                        
+                    elif var in ['nbp','gpp','cSoil','cVeg']:
+                        if unit_conversions[var][1]:
+                            data[reg]=(xrds[var]*area_atm).sum(dim=('lat','lon'), skipna=True)
+                        else:
+                            data[reg]=(xrds[var]).weighted(area_atm).mean(dim=('lat','lon'), skipna=True)
+                    elif var=='co2':
+                        data[reg]=(xrds[var]).isel(lev=1).weighted(area_catm).mean(dim=('lat','lon'), skipna=True)
+                        print(f'co2 {data[reg]}')
+                        print(xrds[var])
+                    elif var=='talk':
+                        thk=xr.open_dataset(f'{local_path}/thkcello_Omon_EC-Earth3-CC_esm-pi-cdr-pulse_r1i1p1f1_gr_{syear}01-{syear}12.nc',engine='h5netcdf')
+                        thkb=thk.thkcello.fillna(0)
+                        data[reg]=(xrds[var]*thkb*areab).sum(dim=('i','j','lev'), skipna=True)
+                    elif var=='alkalinization'  or var=='fco2removal2D':
+                        data[reg]=(xrds[var]*area_pis).sum(dim=('y','x'), skipna=True)
+                
+                    
+                    else:
+                        print(var)
+                        if unit_conversions[var][1]:
+                            data[reg]=(xrds[var]*areab).sum(dim=('i','j'), skipna=True)
+                        else:
+                            data[reg]=(xrds[var]).weighted(areab).mean(dim=('i','j'), skipna=True)
+                    print(data[reg])
+                    print('--------------------------------')
+                convert_units(data,var)
+                if var=='alkalinization' or var == 'omegac' or var=='fco2removal2D':
+                    timevalues=xrds.time_counter.values
+                else:
+                    timevalues=xrds.time.values
+                print(timevalues)
+                print(data['glob'].values)
+                orig_unit=xrds[var].attrs['units']
+                if vars[var][-3:]=='reg':
+                    # create Dataset for given variables
+                    outds = xr.Dataset(
+                        {
+                            "global": (["time"], data['glob'].values,{'units':units[vars[var]]}),
+                            "US_EEZ": (["time"], data['US'].values,{'units':units[vars[var]]}),
+                            "EU_EEZ": (["time"], data['EU'].values,{'units':units[vars[var]]}),
+                            "CHINA_EEZ": (["time"], data['CHINA'].values,{'units':units[vars[var]]}),
+                            },
+                        coords={
+                            "time": timevalues,
+                            #"reference_time": pd.Timestamp("2015-01-01"),
+                            }
+                    )
+                else:
+                    outds = xr.Dataset(
+                        {
+                            "global": (["time"], data['glob'].values,{'units':units[vars[var]]}),
+                            },
+                        coords={
+                            "time": timevalues,
+                            #"reference_time": pd.Timestamp("2015-01-01"),
+                            }
+                    )
+                
+                reftime=pd.Timestamp("2015-01-01")
+                outds['time'].encoding['dtype']=float
+                outds['time'].encoding['units']=f"days since {reftime}"
+                outds.attrs={'Source':'EC-Earth3-CC', 'Author':'Tommi Bergman','Institute':'Finnish Meteorological Institute', 'Project':'OceanNETs','Experiment':experiment_id, 'Created':f'{cyear}-{cmonth}-{cday} {chour}',
+                            'original_variable':f'{var}','original unit':orig_unit, 'unit_conversion':f'{unit_conversions[var]}'}
+                print(outds)
+                print('write to disk')
+                print(f'{outpath}/{outputname}')
+                
+                #outds.to_netcdf(f'{outpath}/{vars[var]}_testi_{syear}.nc',engine='h5netcdf')
+                outds.to_netcdf(f'{outpath}/{outputname}',engine='h5netcdf')
+                print(f'make a copy {exp},{var}')
+                print(exp)
+                if exp == 'C5AF':
+                    print('copy initila files for other exp')
+                    for exp1 in expnames.keys():
+                        print(exp1)
+                        print(exp1)
+                        if exp == 'E40H' and int(syear) < 2080:
+                            outpath=f'/Volumes/ONETs-SSD/{expnames[exp1]}'
+                            outputname=f'{vars[var]}_{model_id}_{expnames[exp1]}_{time_range}_{version_id}.{syear}.nc'
+                            outds.attrs={'Source':'EC-Earth3-CC', 'Author':'Tommi Bergman','Institute':'Finnish Meteorological Institute', 'Project':'OceanNETs','Experiment':f'{expnames[exp1]}', 'Created':f'{cyear}-{cmonth}-{cday} {chour}',
+                                    'original_variable':f'{var}','original unit':orig_unit, 'unit_conversion':f'{unit_conversions[var]}'}
+                            outds.to_netcdf(f'{outpath}/{outputname}',engine='h5netcdf')
+                        elif  (exp == 'D40H' or exp == 'C40H') and int(syear) < 2040:
+        
+                            print(exp1)
+                            outpath=f'/Volumes/ONETs-SSD/{expnames[exp1]}'
+                            print(outpath)
+                            outputname=f'{vars[var]}_{model_id}_{expnames[exp1]}_{time_range}_{version_id}.{syear}.nc'
+                            print(outputname)
+                            outds.attrs={'Source':'EC-Earth3-CC', 'Author':'Tommi Bergman','Institute':'Finnish Meteorological Institute', 'Project':'OceanNETs','Experiment':f'{expnames[exp1]}', 'Created':f'{cyear}-{cmonth}-{cday} {chour}',
+                                    'original_variable':f'{var}','original unit':orig_unit, 'unit_conversion':f'{unit_conversions[var]}'}
+                            outds.to_netcdf(f'{outpath}/{outputname}',engine='h5netcdf')
+                        elif  exp == 'D30H'  and int(syear) < 2030:
+        
+                            print(exp1)
+                            outpath=f'/Volumes/ONETs-SSD/{expnames[exp1]}'
+                            print(outpath)
+                            outputname=f'{vars[var]}_{model_id}_{expnames[exp1]}_{time_range}_{version_id}.{syear}.nc'
+                            print(outputname)
+                            outds.attrs={'Source':'EC-Earth3-CC', 'Author':'Tommi Bergman','Institute':'Finnish Meteorological Institute', 'Project':'OceanNETs','Experiment':f'{expnames[exp1]}', 'Created':f'{cyear}-{cmonth}-{cday} {chour}',
+                                    'original_variable':f'{var}','original unit':orig_unit, 'unit_conversion':f'{unit_conversions[var]}'}
+                            outds.to_netcdf(f'{outpath}/{outputname}',engine='h5netcdf')
+
+
+                else:
+                    #outds.to_netcdf(f'{outpath}/{vars[var]}_testi_{syear}.nc',engine='h5netcdf')
+                    outds.to_netcdf(f'{outpath}/{outputname}',engine='h5netcdf')
+                outds.close()
+                xrds.close()
+                if var=='talk':
+                    thk.close()
     
 def change_origin_Date(ds,date_string):
     # Extract the time values
@@ -365,15 +395,13 @@ def date_string():
 if __name__ == "__main__":
     outputnames={'phos':'phos'}
     # Paths
-    exp=['D30H','C40H']
-    localdatapath='.'
-    localdatapath='/Volumes/ONETs-SSD/'
-    local_path = localdatapath+'/'+exp[0]+'/'
-    isExist = os.path.exists(local_path)
-    if not isExist:
-        # Create a new directory because it does not exist
-        os.makedirs(local_path)
-    
+    #exp=['C5AF','D30H','D40H','C40H','E40H']
+    #exp=['C5AF']
+    #exp=['D30H']
+    #exp=['D40H']
+    exp=['C40H']
+    #exp=['E40H']
+
     #mask_eu_us_china=xr.open_dataset('../mask-creation/mask-eu-us-china.nc')
     #download_data_via_ssh(hostname, username, password, remote_path, local_path, 'areacello*nc')
     # Download data via SSH
@@ -386,7 +414,14 @@ if __name__ == "__main__":
     #download_data_via_ssh(hostname, username, password, remote_path, local_path, filname)
 
     # Read and save data in NetCDF format
-    read_and_save_netcdf(local_path,exp[0])
+    for ex in exp:
+        localdatapath='/Volumes/ONETs-SSD/'
+        local_path = localdatapath+'/'+ex+'/'
+        isExist = os.path.exists(local_path)
+        if not isExist:
+            # Create a new directory because it does not exist
+            os.makedirs(local_path)
+        read_and_save_netcdf(local_path,ex)
 
 
    
